@@ -35,3 +35,115 @@ https://www.startdataengineering.com/post/design-patterns
 - Conditional/dynamic pipelines
 - Disconnected pipelines
 - Self-healing pipelines
+
+## 14-06-2026
+
+### What I worked on
+- Explored OpenWeatherMap API response structure — identified available fields,
+  data types, and their meanings
+- Saved JSON responses from 4 cities: Bekasi, Bandung, Jakarta, and Surabaya
+- Designed and created the raw schema and weather_raw table in PostgreSQL:
+
+    CREATE TABLE raw.weather_raw (
+        id          SERIAL PRIMARY KEY,
+        city        VARCHAR(100)  NOT NULL,
+        observed_at TIMESTAMPTZ   NOT NULL,
+        payload     JSONB         NOT NULL,
+        ingested_at TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+        UNIQUE(city, observed_at)
+    );
+
+- Read: Data Pipeline Design Patterns #2 — Coding Patterns in Python
+  (startdataengineering.com/post/code-patterns/)
+
+- Built a complete raw ingest pipeline in Python across 4 modules:
+  - config.py — loads and exposes environment variables (DB credentials, API key)
+  - ingest.py — extract function: calls OpenWeatherMap API, returns JSON response
+  - db.py — load function: inserts raw JSON into raw.weather_raw with idempotency
+  - main.py — orchestrator: opens one DB connection, loops over cities, calls
+    extract then load for each
+- Ran pipeline 3+ times consecutively and verified row count stayed identical —
+  ON CONFLICT (city, observed_at) DO NOTHING confirmed working
+
+### What I learned
+
+**Database concepts**
+- TIMESTAMP vs TIMESTAMPTZ: TIMESTAMP stores date and time with no timezone
+  context — the same value can be interpreted differently depending on the server
+  location. TIMESTAMPTZ stores the moment in UTC and converts to local timezone
+  on display. Always use TIMESTAMPTZ in data engineering.
+- JSON vs JSONB: JSON stores raw text as-is. JSONB stores data in a parsed binary
+  format — faster to query, supports indexing into nested fields, and is the
+  correct choice for pipeline storage even though key ordering is not preserved.
+- Database index: a separate lookup structure that lets PostgreSQL jump directly
+  to matching rows instead of scanning the entire table — critical for
+  performance at scale.
+- SERIAL: shorthand for an auto-incrementing integer backed by a PostgreSQL
+  sequence (nextval). Not magic — just a sequence called automatically on INSERT.
+- Natural key: a combination of columns that are already meaningful in the
+  real world and are naturally unique per row — e.g. (city, observed_at) for
+  weather data. Different from a surrogate key (like id SERIAL) which is an
+  artificial number with no business meaning.
+- OpenWeatherMap returns temperature in Kelvin. Conversion to Celsius
+  (value - 273.15) happens in the staging layer, not in raw.
+- Unix timestamp: integer representing seconds elapsed since 1970-01-01 00:00:00
+  UTC. Field dt in the API response is a Unix timestamp — must be converted to
+  TIMESTAMPTZ before storing in observed_at.
+
+**Code design patterns (from article #2)**
+- Functional design principles:
+  - Atomicity: one function does exactly one task — nothing more
+  - Idempotency: same input always produces same output regardless of how many
+    times the function is called — no duplicates, no side effects on state
+  - No side effects: a function must not modify anything outside its own scope —
+    no global variables, no external state changes beyond its return value
+
+- Factory pattern: when multiple pipelines share the same structure (e.g.
+  LinkedIn, Reddit pipelines), define a common interface (AbstractPipeline) and
+  implement it as separate concrete classes per source. A factory then maps a
+  string key to the correct class — eliminates complex if/else chains and makes
+  adding new sources easy without touching existing code.
+
+- Singleton pattern: ensures only one instance of a class exists throughout the
+  entire runtime — commonly used for database connections and loggers. However,
+  it is considered an anti-pattern for testing because it makes it impossible to
+  isolate state between test cases.
+
+- Python helpers relevant to DE:
+  - typing: provides type hints and type checking — makes function signatures
+    explicit about what goes in and what comes out, catches bugs early
+  - dataclass: a clean way to define classes that primarily hold data — less
+    boilerplate than regular classes
+  - context managers (with keyword): automatically handles setup and teardown
+    of external connections (database, files) — guarantees close() is called
+    even if an error occurs, preventing memory leaks
+  - pytest: testing framework
+  - decorators: functions that wrap other functions to add behavior
+
+  **From practice**
+- DB connection must be opened once outside the loop — opening a new connection
+  per city is wasteful and slow (one trip to the post office per letter vs. one
+  trip for all letters)
+- ON CONFLICT DO NOTHING works because PostgreSQL checks the UNIQUE(city,
+  observed_at) constraint on every INSERT — if the combination already exists,
+  the row is silently skipped, no error, no duplicate
+- Separating concerns across files (config / ingest / db / main) means each file
+  has exactly one reason to change — if the API changes, only ingest.py is
+  touched; if the DB changes, only db.py
+
+### What I don't understand yet
+- Strategy pattern — mentioned in the article but not fully clear
+- Callable type hint with nested generics:
+
+    from typing import Callable, List
+
+    def transformation_factory(value: str) -> Callable[[List[SocialMediaData]], List[SocialMediaData]]:
+        factory = {
+            'sd': standard_deviation_outlier_filter,
+            'no_tx': no_transformation,
+            'rand': random_choice_filter,
+        }
+        return factory[value]
+
+  Callable[[input_types], output_type] means the function returns another
+  function — but the nested List syntax is still confusing.
