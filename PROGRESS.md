@@ -147,3 +147,36 @@ https://www.startdataengineering.com/post/design-patterns
 
   Callable[[input_types], output_type] means the function returns another
   function — but the nested List syntax is still confusing.
+
+
+## 15-06-2026
+
+### What I worked on
+- Added raw JSON validation in db.py before processing
+- Modified load() to return (inserted, skipped) row counts
+- Built logger.py — logging module with file and console handlers
+- Integrated logger into main.py — every run now produces a structured log
+- Added pipeline duration tracking using time.perf_counter()
+
+### What I learned
+- Logging is not optional in production pipelines — without it, if something
+  breaks at 3am you have no way to know what happened, when it happened, or
+  which city caused the failure. print() disappears when the terminal closes;
+  log files persist.
+- Tracking inserted vs skipped rows per run makes idempotency observable —
+  you can see exactly whether data was new or a duplicate, not just assume
+  the pipeline worked correctly.
+- Defensive validation in db.py (checking that required keys exist in raw_json
+  before touching the database) prevents silent partial failures — the pipeline
+  fails loudly with a clear message instead of crashing with a cryptic KeyError
+  deep in the stack.
+- time.perf_counter() is more accurate than time.time() for measuring duration
+  because it is not affected by system clock changes or NTP sync. Use
+  time.time() for timestamps (when something happened), perf_counter() for
+  duration (how long something took).
+
+### What the log looks like now
+  2026-06-15 17:34:30 INFO     Pipeline started
+  2026-06-15 17:34:31 INFO     Jakarta done, inserted = 0, skipped = 1
+  2026-06-15 17:34:31 INFO     Bandung done, inserted = 1, skipped = 0
+  2026-06-15 17:34:32 INFO     Pipeline finished, dur=1.19s
