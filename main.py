@@ -23,7 +23,7 @@ with psycopg2.connect(
         try:
             log.info(f"Fetching {city}...")
 
-            data = extract(city, config.API_KEY)
+            data = extract(city, config.API_KEY, log)
 
             inserted, skipped = load(conn, data)
             
