@@ -180,3 +180,27 @@ https://www.startdataengineering.com/post/design-patterns
   2026-06-15 17:34:31 INFO     Jakarta done, inserted = 0, skipped = 1
   2026-06-15 17:34:31 INFO     Bandung done, inserted = 1, skipped = 0
   2026-06-15 17:34:32 INFO     Pipeline finished, dur=1.19s
+
+## 16-06-2026
+
+### What I worked on
+- Added retry loop with exponential backoff — up to 3 attempts per API call
+- Added 10-second timeout to the GET request
+- Catch exceptions and log them with clear error messages
+- Added a log parameter to the extract function so retry attempts get logged
+- Verified retry behavior by inspecting the resulting log output
+
+### What I learned
+- When retrying a failed request, exponential backoff gives the server time to
+  recover — some errors are transient (e.g. the server is temporarily
+  overloaded and needs a moment to catch up), and retrying immediately would
+  just add to that load
+- A 10-second timeout prevents the pipeline from hanging indefinitely waiting
+  for a response — it fails fast and retries instead of stalling forever
+- Logging the exception message on each failed attempt makes it possible to
+  trace exactly what went wrong later, instead of guessing
+- TODO: the log currently exposes the raw API key in error messages
+  (e.g. when the request URL fails) — acceptable for local development, but
+  must be masked before this pipeline goes anywhere near production
+
+  
