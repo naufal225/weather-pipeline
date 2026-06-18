@@ -4,6 +4,7 @@ from db import load
 import psycopg2
 from logger import get_logger
 import time
+from staging import transform_load
 
 log = get_logger("main")
 
@@ -31,9 +32,14 @@ try:
                 inserted, skipped = load(conn, data)
                 
                 log.info(f"{city} done, inserted = {inserted}, skipped = {skipped}")
+                
             except Exception as err:
                 log.error(f"Error: {err}")
-                
+         
+        inserted, skipped = transform_load(conn)
+        
+        log.info(f"Insert to staging done, inserted = {inserted}, skipped = {skipped}")
+               
     log.info("Database connection closed")
 except psycopg2.OperationalError as err:
     log.error(f"Error: {err}")
