@@ -57,3 +57,17 @@ pipeline runs with the same input.
 Verified by running the pipeline 10 times consecutively: row count in
 `raw.weather_raw` remained identical after the first successful run, with
 subsequent runs logging `inserted = 0, skipped = 1` for unchanged data.
+
+## Staging Schema Design
+
+| Column | Type | Reasoning |
+|--------|------|-----------|
+| `id` | `SERIAL` | Auto-incrementing surrogate key — always increases by 1, no business meaning |
+| `city` | `VARCHAR(100)` | Stores city name, which is alphabetic text |
+| `observed_at` | `TIMESTAMPTZ` | Stores the observation timestamp while preserving timezone information |
+| `temp_celsius` | `NUMERIC(5,2)` | Temperature after Kelvin→Celsius conversion is almost always a decimal value |
+| `humidity` | `INTEGER` | Humidity is always a whole number (percentage) |
+| `weather_main` | `VARCHAR(50)` | Short weather category label (e.g. "Clouds", "Rain") |
+| `weather_description` | `VARCHAR(100)` | Longer weather description text (e.g. "scattered clouds") |
+| `wind_speed` | `NUMERIC(5,2)` | Wind speed can have decimal values |
+| `loaded_at` | `TIMESTAMPTZ` | Records when the row was loaded into staging, with timezone information |
