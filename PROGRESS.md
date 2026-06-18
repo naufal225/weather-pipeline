@@ -203,4 +203,27 @@ https://www.startdataengineering.com/post/design-patterns
   (e.g. when the request URL fails) — acceptable for local development, but
   must be masked before this pipeline goes anywhere near production
 
-  
+## 18-06-2026
+
+### What I worked on
+- Wrapped the database connection (psycopg2.connect) in a try/except block —
+  previously, a failed connection would crash with a raw Python traceback
+  instead of a clean log entry
+- Ran three failure simulations against the pipeline: internet disconnected,
+  invalid API key, and PostgreSQL service stopped
+
+### What I learned
+- Adding logging around opening, closing, and failing a database connection
+  significantly improves observability — without it, a connection failure at
+  3am would leave zero trace in the logs, only a silent crash
+- When psycopg2 opens a connection, it tries IPv6 (::1) first, then falls back
+  to IPv4 (127.0.0.1) if that fails — this is why a connection refusal can
+  produce two error lines instead of one, and also explains a few seconds of
+  delay before the failure is reported
+- Confirmed all three failure modes behave correctly:
+  - Internet down → retried 3x with exponential backoff, then failed per city,
+    pipeline continued to the next city
+  - Invalid API key (401) → failed immediately without retrying, since retrying
+    a bad key would never succeed
+  - PostgreSQL down → now fails with a clear logged error instead of an
+    unhandled traceback
