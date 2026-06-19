@@ -11,7 +11,7 @@ log = get_logger("main")
 start = time.perf_counter()
 log.info("Pipeline started")
 
-cities = ["Jakarta", "Bekasi", "Bandung", "Surabaya", "Semarang"]
+cities = ["Jakarta", "Bekasi", "Bandung", "Surabaya", "Semarang", "Depok"]
 
 try:
     log.info("Openning database connection...")
