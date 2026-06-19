@@ -36,7 +36,7 @@ try:
             except Exception as err:
                 log.error(f"Error: {err}")
          
-        inserted, skipped = transform_load(conn)
+        inserted, skipped = transform_load(conn, log)
         
         log.info(f"Insert to staging done, inserted = {inserted}, skipped = {skipped}")
                
