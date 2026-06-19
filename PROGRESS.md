@@ -227,3 +227,32 @@ https://www.startdataengineering.com/post/design-patterns
     a bad key would never succeed
   - PostgreSQL down → now fails with a clear logged error instead of an
     unhandled traceback
+
+## 19-06-2026
+
+### What I worked on
+- Built staging.py — reads from raw.weather_raw, validates each row, converts
+  temperature from Kelvin to Celsius, and loads clean data into staging.weather
+- Updated main.py to call transform_load() after the raw ingest loop
+- Wrote safe_get() helper function to apply DRY principle when extracting nested
+  fields from JSONB payload — returns None safely instead of crashing with
+  KeyError if a field is missing
+
+### What I learned
+- Data entering the staging layer must be validated — both for presence
+  (required fields must not be None) and for plausibility (temperature must be
+  within the physically possible range of -90°C to 60°C)
+- Invalid rows are not deleted — they stay in raw.weather_raw and are simply
+  skipped during staging load. This preserves replayability and backfill
+  capability: if validation logic changes in the future, we can reprocess from
+  raw without data loss
+- Including raw_id in warning log messages creates a concrete audit trail —
+  instead of just knowing "some row was skipped", we know exactly which row
+  in raw.weather_raw was rejected and why, making future investigation
+  straightforward:
+    SELECT * FROM raw.weather_raw WHERE id = 172;
+- .get() vs direct key access: payload["key"] raises KeyError if missing,
+  payload.get("key") returns None safely. For nested dicts, chain with a
+  default empty dict: payload.get("outer", {}).get("inner")
+- safe_get(*keys) generalizes this pattern for arbitrary nesting depth —
+  one helper function replaces repetitive try/except or chained .get() calls
