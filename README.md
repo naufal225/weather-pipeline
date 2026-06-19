@@ -1,3 +1,25 @@
+# Weather Data Pipeline
+
+A production-grade data pipeline that ingests weather data from the 
+OpenWeatherMap API into PostgreSQL, with a raw → staging architecture, 
+idempotent loads, structured logging, and data validation.
+
+**Cities monitored:** Jakarta, Bekasi, Bandung, Surabaya, Semarang, Depok, Boyolali 
+**Stack:** Python · PostgreSQL · psycopg2
+
+## Staging Layer
+
+The staging layer reads from `raw.weather_raw`, validates each row, 
+transforms the data, and loads clean records into `staging.weather`.
+
+Transformations applied:
+- Temperature converted from Kelvin to Celsius (value - 273.15)
+- Nested JSONB fields unpacked into typed columns
+
+Validation rules (invalid rows are logged and skipped, not deleted):
+- Required fields must not be null: city, observed_at, temp, humidity
+- Temperature must be within physical range: -90°C to 60°C
+
 ## Lessons Learned
 
 ### Why idempotency matters
