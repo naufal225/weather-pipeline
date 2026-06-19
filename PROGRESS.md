@@ -237,6 +237,12 @@ https://www.startdataengineering.com/post/design-patterns
 - Wrote safe_get() helper function to apply DRY principle when extracting nested
   fields from JSONB payload — returns None safely instead of crashing with
   KeyError if a field is missing
+- Added Depok to the cities list in main.py
+- Injected two invalid rows directly into raw.weather_raw to verify validation
+  behavior: one with a missing "name" field, one with an out-of-range temperature
+  (500K = 226.85°C)
+- Ran the full pipeline multiple times to verify end-to-end idempotency across
+  both layers
 
 ### What I learned
 - Data entering the staging layer must be validated — both for presence
@@ -256,3 +262,19 @@ https://www.startdataengineering.com/post/design-patterns
   default empty dict: payload.get("outer", {}).get("inner")
 - safe_get(*keys) generalizes this pattern for arbitrary nesting depth —
   one helper function replaces repetitive try/except or chained .get() calls
+- Idempotency holds at both layers independently — raw uses UNIQUE(city,
+  observed_at) with ON CONFLICT DO NOTHING, and staging uses the exact same
+  mechanism. Running the pipeline 5 times produced identical row counts after
+  the first successful run.
+- The staging skipped count equals the total rows in raw (not just "previously
+  processed" rows) because transform_load always queries all of raw.weather_raw
+  on every run — ON CONFLICT DO NOTHING handles deduplication. This is a known
+  inefficiency that will be fixed with watermarking in Month 2.
+- The cities list design makes the pipeline flexible — adding a new city requires
+  only one change (adding a string to the list in main.py). The ingest and load
+  modules have no knowledge of which cities are being processed; they only handle
+  one city at a time. This is a direct benefit of separation of concerns.
+- Validation in staging works as designed: invalid rows are skipped with a
+  WARNING log containing the raw.id, city, and reason — not silently dropped,
+  not inserted as corrupt data. The raw record is preserved for future
+  reprocessing.
