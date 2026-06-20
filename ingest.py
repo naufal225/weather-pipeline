@@ -22,6 +22,28 @@ def extract(city: str, api_key: str, log: logging.Logger) -> dict:
             
             wait = 2 ** (attempt + 1)
             
-            log.warning(f"Attempt: {attempt}, try again after: {wait}s")
+            log.warning(f"Attempt to extract current weather: {attempt}, try again after: {wait}s")
+            
+            time.sleep(wait)
+
+def extract_forecast(city: str, api_key: str, log: logging.Logger) -> dict:
+    for attempt in range(MAX_RETRIES):
+        try:
+            url = f"https://api.openweathermap.org/data/2.5/forecast?q={city}&appid={api_key}"
+            response = requests.get(url, timeout=10)
+            
+            if(response.status_code != 200):
+                raise Exception(f"API_Error: {response.status_code} - {response.text}")
+            
+            data = response.json()
+            
+            return data
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as ex:
+            if(attempt == MAX_RETRIES - 1):
+                raise Exception(ex)
+            
+            wait = 2 ** (attempt + 1)
+            
+            log.warning(f"Attempt to extract forecast weather: {attempt}, try again after: {wait}s")
             
             time.sleep(wait)

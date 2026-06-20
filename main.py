@@ -1,10 +1,10 @@
 import config
-from ingest import extract
-from db import load
+from ingest import extract, extract_forecast
+from db import load, load_forecast
 import psycopg2
 from logger import get_logger
 import time
-from staging import transform_load
+from staging import transform_load, transform_load_forecast
 
 log = get_logger("main")
 
@@ -12,6 +12,7 @@ start = time.perf_counter()
 log.info("Pipeline started")
 
 cities = ["Jakarta", "Bekasi", "Bandung", "Surabaya", "Semarang", "Depok", "Boyolali"]
+apiKey = config.API_KEY
 
 try:
     log.info("Openning database connection...")
@@ -27,19 +28,26 @@ try:
             try:
                 log.info(f"Fetching {city}...")
 
-                data = extract(city, config.API_KEY, log)
+                current_weather_data = extract(city, apiKey, log)
+                forecast_weather_data = extract_forecast(city, apiKey, log)
 
-                inserted, skipped = load(conn, data)
+                current_inserted, current_skipped = load(conn, current_weather_data)
+                log.info(f"Current weather: {city} done, inserted = {current_inserted}, skipped = {current_skipped}")
                 
-                log.info(f"{city} done, inserted = {inserted}, skipped = {skipped}")
+                forecast_inserted, forecast_skipped = load_forecast(conn, forecast_weather_data, log)
+                log.info(f"Forecast weather: {city} done, inserted = {forecast_inserted}, skipped = {forecast_skipped}")              
                 
             except Exception as err:
                 log.error(f"Error: {err}")
          
-        inserted, skipped = transform_load(conn, log)
+        current_inserted, current_skipped = transform_load(conn, log)
         
-        log.info(f"Insert to staging done, inserted = {inserted}, skipped = {skipped}")
+        log.info(f"Insert current weather to staging done, inserted = {current_inserted}, skipped = {current_skipped}")
+        
+        forecast_inserted, forecast_skipped = transform_load_forecast(conn, log)
                
+        log.info(f"Insert forecast weather to staging done, inserted = {forecast_inserted}, skipped = {forecast_skipped}")
+    
     log.info("Database connection closed")
 except psycopg2.OperationalError as err:
     log.error(f"Error: {err}")
