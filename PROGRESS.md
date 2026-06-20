@@ -278,3 +278,33 @@ https://www.startdataengineering.com/post/design-patterns
   WARNING log containing the raw.id, city, and reason — not silently dropped,
   not inserted as corrupt data. The raw record is preserved for future
   reprocessing.
+
+## 20-06-2026
+
+### What I worked on
+- Added load_forecast() to db.py — loops through 40 forecast time slots per
+  city, inserts each as a separate row into raw.forecast_raw
+- Added transform_load_forecast() to staging.py — reads from raw.forecast_raw,
+  validates, converts Kelvin to Celsius, and loads into staging.forecast
+- Added extract_forecast() to ingest.py — calls the 5-day/3-hour forecast
+  endpoint with the same retry and timeout logic as extract()
+- Updated main.py to orchestrate the full forecast pipeline alongside the
+  existing current weather pipeline
+
+### What I learned
+- safe_get() only traverses nested dicts — it cannot index into a list.
+  weather in the payload is a list ([{...}]), not a dict, so
+  safe_get(payload, "weather", "main") returns None. The correct approach is
+  payload.get("weather", [{}])[0].get("main") — access index 0 first, then
+  call .get() on the resulting dict.
+- raw.forecast_raw has many more rows than staging.forecast because they serve
+  different purposes. Raw uses a 3-column natural key (city, forecast_for,
+  ingested_at) — every pipeline run creates 40 new rows per city because
+  ingested_at is always different. Staging uses a 2-column key (city,
+  forecast_for) with ON CONFLICT DO UPDATE — only one row per time slot is
+  kept, always reflecting the latest prediction.
+- Data reconciliation workflow: when row counts don't match expectations,
+  break the aggregate down by dimension (GROUP BY city), then check for
+  duplicates (HAVING COUNT(*) > 1). Empty result = no duplicates = the
+  difference is legitimate, not a bug. This is how DE investigates data
+  anomalies systematically instead of guessing.
