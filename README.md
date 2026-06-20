@@ -93,3 +93,21 @@ subsequent runs logging `inserted = 0, skipped = 1` for unchanged data.
 | `weather_description` | `VARCHAR(100)` | Longer weather description text (e.g. "scattered clouds") |
 | `wind_speed` | `NUMERIC(5,2)` | Wind speed can have decimal values |
 | `loaded_at` | `TIMESTAMPTZ` | Records when the row was loaded into staging, with timezone information |
+
+
+## Architecture Decision: Separate Tables for Current vs Forecast
+
+**Decision:** Store current weather and forecast data in separate raw tables
+(`raw.weather_raw` and `raw.forecast_raw`).
+
+**Reasons:**
+- Different response structures: current weather returns a single object,
+  forecast returns a list of 40 time slots (5 days × 8 slots/day)
+- Different natural keys: current uses (city, observed_at), forecast needs
+  (city, forecast_for) where forecast_for is the predicted time slot
+- Schema flexibility: each table can evolve independently as API changes
+
+**Alternative considered:** Single table with a `data_type` column
+('current'/'forecast'). Rejected because mixing two structurally different
+payloads in one table complicates the natural key and makes staging
+transformation harder to reason about.
