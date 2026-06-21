@@ -111,3 +111,33 @@ subsequent runs logging `inserted = 0, skipped = 1` for unchanged data.
 ('current'/'forecast'). Rejected because mixing two structurally different
 payloads in one table complicates the natural key and makes staging
 transformation harder to reason about.
+
+## Pipeline Architecture
+
+![Pipeline Diagram](docs/pipeline_diagram.png)
+
+```mermaid
+flowchart LR
+    subgraph API["Weather API"]
+        current[current weather]
+        forecast[forecast]
+    end
+
+    subgraph pipeline["ETL Weather Pipeline (main.py)"]
+        extract --> load_raw["load to raw"]
+        load_raw --> transform
+        transform --> load_staging["load to staging"]
+    end
+
+    subgraph db["PostgreSQL"]
+        raw["raw layer\n(weather_raw, forecast_raw)"]
+        staging["staging layer\n(weather, forecast)"]
+    end
+
+    API --> extract
+    load_raw --> raw
+    load_staging --> staging
+
+    config["config.py"] -.-> pipeline
+    logger["logger.py"] -.-> pipeline
+```
